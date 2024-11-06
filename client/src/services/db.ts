@@ -5,6 +5,14 @@ const API_BASE_URL =
     ? "https://image-generator-seven-zeta.vercel.app/api"
     : "http://localhost:3002/api";
 
+interface DBImage {
+  id: number;
+  prompt: string;
+  imageUrl: string;
+  positionX: number;
+  positionY: number;
+}
+
 export class DatabaseService {
   async initialize() {
     // No initialization needed for cloud DB
@@ -56,15 +64,40 @@ export class DatabaseService {
     try {
       const response = await fetch(`${API_BASE_URL}/images`);
       const data = await response.json();
-      return data.map((row: any) => ({
-        id: row.id,
-        prompt: row.prompt,
-        imageUrl: row.imageUrl,
-        position: {
-          x: row.positionX,
-          y: row.positionY,
-        },
-      }));
+
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error("Unexpected response format:", data);
+        return [];
+      }
+
+      const images: GeneratedImage[] = data
+        .filter((row): row is DBImage => {
+          const isValid =
+            typeof row === "object" &&
+            row !== null &&
+            typeof row.id === "number" &&
+            typeof row.prompt === "string" &&
+            typeof row.imageUrl === "string" &&
+            typeof row.positionX === "number" &&
+            typeof row.positionY === "number";
+
+          if (!isValid) {
+            console.error("Invalid row data:", row);
+          }
+          return isValid;
+        })
+        .map((row) => ({
+          id: row.id,
+          prompt: row.prompt,
+          imageUrl: row.imageUrl,
+          position: {
+            x: row.positionX,
+            y: row.positionY,
+          },
+        }));
+
+      return images;
     } catch (error) {
       console.error("Failed to get images:", error);
       return [];

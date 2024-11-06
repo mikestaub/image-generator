@@ -14,21 +14,11 @@ const port = process.env.PORT || 3002;
 app.use(cors());
 app.use(express.json());
 
-// Initialize SQLite Cloud and run migrations
-let db: Database;
-
-async function initializeDb() {
-  try {
-    await runMigrations();
-    db = new Database(process.env.SQLITE_CLOUD_CONNECTION_STRING!);
-    console.log("Database initialized successfully");
-  } catch (error) {
-    console.error("Failed to initialize database:", error);
-    process.exit(1);
-  }
-}
-
-initializeDb();
+// Initialize SQLite Cloud connection for each request
+const getDb = async () => {
+  const db = new Database(process.env.SQLITE_CLOUD_CONNECTION_STRING!);
+  return db;
+};
 
 // Configure fal client
 fal.config({
@@ -41,24 +31,37 @@ const openai = new OpenAIApi(
   })
 );
 
+// Run migrations on startup (only in development)
+if (process.env.NODE_ENV !== "production") {
+  runMigrations().catch(console.error);
+}
+
 // DB endpoints
 app.get("/api/images", async (_req: Request, res: Response) => {
+  let db;
   try {
+    db = await getDb();
     const result = await db.sql`
       SELECT id, prompt, imageUrl, positionX, positionY
       FROM images
       ORDER BY id DESC;
     `;
-    res.json(result);
+    res.json(Array.isArray(result) ? result : []);
   } catch (error) {
     console.error("Failed to get images:", error);
-    res.status(500).json({ error: "Failed to get images" });
+    res.json([]);
+  } finally {
+    if (db) {
+      db.close();
+    }
   }
 });
 
 app.post("/api/images", async (req: Request, res: Response) => {
   const { prompt, imageUrl, positionX, positionY } = req.body;
+  let db;
   try {
+    db = await getDb();
     const result = await db.sql`
       INSERT INTO images (prompt, imageUrl, positionX, positionY)
       VALUES (${prompt}, ${imageUrl}, ${positionX}, ${positionY})
@@ -68,13 +71,19 @@ app.post("/api/images", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Failed to save image:", error);
     res.status(500).json({ error: "Failed to save image" });
+  } finally {
+    if (db) {
+      db.close();
+    }
   }
 });
 
 app.put("/api/images/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
   const { prompt, imageUrl, positionX, positionY } = req.body;
+  let db;
   try {
+    db = await getDb();
     await db.sql`
       UPDATE images
       SET prompt = ${prompt},
@@ -87,12 +96,18 @@ app.put("/api/images/:id", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Failed to update image:", error);
     res.status(500).json({ error: "Failed to update image" });
+  } finally {
+    if (db) {
+      db.close();
+    }
   }
 });
 
 app.delete("/api/images/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
+  let db;
   try {
+    db = await getDb();
     await db.sql`
       DELETE FROM images
       WHERE id = ${id};
@@ -101,6 +116,10 @@ app.delete("/api/images/:id", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Failed to delete image:", error);
     res.status(500).json({ error: "Failed to delete image" });
+  } finally {
+    if (db) {
+      db.close();
+    }
   }
 });
 
@@ -223,3 +242,5 @@ app.post("/api/variations", async (req: Request, res: Response) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+export default app;
