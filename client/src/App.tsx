@@ -95,6 +95,7 @@ const App: React.FC = () => {
     const duplicate = {
       ...imageToDuplicate,
       id: undefined, // Remove ID so it won't be saved to DB
+      imageUrl: `${imageToDuplicate.imageUrl}#${Date.now()}`, // Make URL unique
       position: {
         x: imageToDuplicate.position.x + 20,
         y: imageToDuplicate.position.y + 20,
@@ -167,9 +168,7 @@ const App: React.FC = () => {
   ) => {
     setImages(
       images.map((img) =>
-        img.imageUrl === image.imageUrl
-          ? { ...img, position: newPosition }
-          : img
+        img === image ? { ...img, position: newPosition } : img
       )
     );
   };
@@ -211,13 +210,11 @@ const App: React.FC = () => {
 
           {images.map((image, index) => (
             <DraggableImage
-              key={`${image.imageUrl}-${index}`}
+              key={image.imageUrl}
               image={image}
               onSave={(savedImage) => {
                 setImages(
-                  images.map((img) =>
-                    img.imageUrl === savedImage.imageUrl ? savedImage : img
-                  )
+                  images.map((img) => (img === savedImage ? savedImage : img))
                 );
               }}
               onGenerateVariations={() =>
