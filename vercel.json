@@ -17,11 +17,8 @@
       "dest": "server/src/server.ts"
     },
     {
-      "handle": "filesystem"
-    },
-    {
       "src": "/(.*)",
-      "dest": "client/build/index.html"
+      "dest": "client/$1"
     }
   ]
 }
