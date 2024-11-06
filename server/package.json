@@ -1,6 +1,9 @@
 {
   "name": "image-generator-server",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@fal-ai/client": "^1.0.4",
     "cors": "^2.8.5",
@@ -18,6 +21,7 @@
   "scripts": {
     "start": "ts-node src/server.ts",
     "build": "tsc",
-    "dev": "ts-node-dev src/server.ts"
+    "dev": "ts-node-dev src/server.ts",
+    "vercel-build": "tsc"
   }
 }
