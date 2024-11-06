@@ -2,7 +2,9 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { Configuration, OpenAIApi } from "openai";
 import { fal } from "@fal-ai/client";
+import { Database } from "@sqlitecloud/drivers";
 import dotenv from "dotenv";
+import { runMigrations } from "./migrations";
 
 dotenv.config();
 
@@ -11,6 +13,22 @@ const port = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
+
+// Initialize SQLite Cloud and run migrations
+let db: Database;
+
+async function initializeDb() {
+  try {
+    await runMigrations();
+    db = new Database(process.env.SQLITE_CLOUD_CONNECTION_STRING!);
+    console.log("Database initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize database:", error);
+    process.exit(1);
+  }
+}
+
+initializeDb();
 
 // Configure fal client
 fal.config({
@@ -22,6 +40,69 @@ const openai = new OpenAIApi(
     apiKey: process.env.OPENAI_API_KEY,
   })
 );
+
+// DB endpoints
+app.get("/api/images", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.sql`
+      SELECT id, prompt, imageUrl, positionX, positionY
+      FROM images
+      ORDER BY id DESC;
+    `;
+    res.json(result);
+  } catch (error) {
+    console.error("Failed to get images:", error);
+    res.status(500).json({ error: "Failed to get images" });
+  }
+});
+
+app.post("/api/images", async (req: Request, res: Response) => {
+  const { prompt, imageUrl, positionX, positionY } = req.body;
+  try {
+    const result = await db.sql`
+      INSERT INTO images (prompt, imageUrl, positionX, positionY)
+      VALUES (${prompt}, ${imageUrl}, ${positionX}, ${positionY})
+      RETURNING id;
+    `;
+    res.json(result[0]);
+  } catch (error) {
+    console.error("Failed to save image:", error);
+    res.status(500).json({ error: "Failed to save image" });
+  }
+});
+
+app.put("/api/images/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { prompt, imageUrl, positionX, positionY } = req.body;
+  try {
+    await db.sql`
+      UPDATE images
+      SET prompt = ${prompt},
+          imageUrl = ${imageUrl},
+          positionX = ${positionX},
+          positionY = ${positionY}
+      WHERE id = ${id};
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Failed to update image:", error);
+    res.status(500).json({ error: "Failed to update image" });
+  }
+});
+
+app.delete("/api/images/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.sql`
+      DELETE FROM images
+      WHERE id = ${id};
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete image:", error);
+    res.status(500).json({ error: "Failed to delete image" });
+  }
+});
 
 app.post("/api/generate", async (req: Request, res: Response) => {
   const { prompt } = req.body;

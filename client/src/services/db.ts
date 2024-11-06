@@ -1,99 +1,84 @@
-import initSqlJs from "sql.js";
 import { GeneratedImage } from "../types/types";
 
+const API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://image-generator-seven-zeta.vercel.app/api"
+    : "http://localhost:3002/api";
+
 export class DatabaseService {
-  private db: any;
-
   async initialize() {
-    const SQL = await initSqlJs({
-      locateFile: (file) => `https://sql.js.org/dist/${file}`,
-    });
-
-    // Load existing data from localStorage or create new DB
-    const savedData = localStorage.getItem("sqliteDB");
-    this.db = savedData
-      ? new SQL.Database(new Uint8Array(JSON.parse(savedData)))
-      : new SQL.Database();
-
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS images (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        prompt TEXT,
-        imageUrl TEXT,
-        positionX REAL,
-        positionY REAL
-      )
-    `);
+    // No initialization needed for cloud DB
   }
 
-  private saveToLocalStorage() {
-    const data = this.db.export();
-    const buffer = new Uint8Array(data);
-    localStorage.setItem("sqliteDB", JSON.stringify(Array.from(buffer)));
-  }
-
-  saveImage(image: GeneratedImage) {
+  async saveImage(image: GeneratedImage): Promise<GeneratedImage | undefined> {
     const { prompt, imageUrl, position, id } = image;
 
-    if (id) {
-      // Update existing image
-      this.db.run(
-        "UPDATE images SET prompt = ?, imageUrl = ?, positionX = ?, positionY = ? WHERE id = ?",
-        [prompt, imageUrl, position.x, position.y, id]
-      );
-    } else {
-      // Check if image with same URL already exists
-      const result = this.db.exec("SELECT id FROM images WHERE imageUrl = ?", [
-        imageUrl,
-      ]);
-
-      if (result.length && result[0].values.length) {
+    try {
+      if (id) {
         // Update existing image
-        const existingId = result[0].values[0][0];
-        this.db.run(
-          "UPDATE images SET prompt = ?, positionX = ?, positionY = ? WHERE id = ?",
-          [prompt, position.x, position.y, existingId]
-        );
+        await fetch(`${API_BASE_URL}/images/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt,
+            imageUrl,
+            positionX: position.x,
+            positionY: position.y,
+          }),
+        });
+        return image;
       } else {
-        // Insert new image
-        this.db.run(
-          "INSERT INTO images (prompt, imageUrl, positionX, positionY) VALUES (?, ?, ?, ?)",
-          [prompt, imageUrl, position.x, position.y]
-        );
+        // Create new image
+        const response = await fetch(`${API_BASE_URL}/images`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt,
+            imageUrl,
+            positionX: position.x,
+            positionY: position.y,
+          }),
+        });
+        const data = await response.json();
+        return { ...image, id: data.id };
       }
+    } catch (error) {
+      console.error("Failed to save image:", error);
+      return undefined;
     }
-
-    this.saveToLocalStorage();
   }
 
-  getAllImages(): GeneratedImage[] {
+  async getAllImages(): Promise<GeneratedImage[]> {
     try {
-      const result = this.db.exec("SELECT * FROM images");
-      if (!result.length) return [];
-
-      return result[0].values.map((row: any) => ({
-        id: row[0],
-        prompt: row[1],
-        imageUrl: row[2],
+      const response = await fetch(`${API_BASE_URL}/images`);
+      const data = await response.json();
+      return data.map((row: any) => ({
+        id: row.id,
+        prompt: row.prompt,
+        imageUrl: row.imageUrl,
         position: {
-          x: row[3],
-          y: row[4],
+          x: row.positionX,
+          y: row.positionY,
         },
       }));
     } catch (error) {
-      console.error("Error getting images:", error);
+      console.error("Failed to get images:", error);
       return [];
     }
   }
 
-  deleteImage(id: number) {
-    this.db.run("DELETE FROM images WHERE id = ?", [id]);
-    this.saveToLocalStorage();
-  }
-
-  clearAllImages() {
-    this.db.run("DELETE FROM images");
-    this.saveToLocalStorage();
+  async deleteImage(id: number) {
+    try {
+      await fetch(`${API_BASE_URL}/images/${id}`, {
+        method: "DELETE",
+      });
+    } catch (error) {
+      console.error("Failed to delete image:", error);
+    }
   }
 }
 

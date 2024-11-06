@@ -12,7 +12,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const initDb = async () => {
       await dbService.initialize();
-      const savedImages = dbService.getAllImages();
+      const savedImages = await dbService.getAllImages();
       setImages(savedImages);
     };
     initDb();

@@ -39,23 +39,19 @@ export const DraggableImage: React.FC<Props> = ({
     onPositionChange(image, newPosition);
   };
 
-  const handleSave = (e: React.MouseEvent) => {
+  const handleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const imageToSave = { ...image, position };
-    dbService.saveImage(imageToSave);
-    const savedImages = dbService.getAllImages();
-    const savedImage = savedImages.find(
-      (img) => img.imageUrl === image.imageUrl
-    );
+    const savedImage = await dbService.saveImage(imageToSave);
     if (savedImage) {
       onSave(savedImage);
     }
   };
 
-  const handleDelete = (e: React.MouseEvent) => {
+  const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (image.id) {
-      dbService.deleteImage(image.id);
+      await dbService.deleteImage(image.id);
     }
     onDelete(image);
   };

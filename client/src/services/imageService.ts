@@ -1,7 +1,12 @@
 import { GeneratedImage } from "../types/types";
 
+const API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://image-generator-seven-zeta.vercel.app/api"
+    : "http://localhost:3002/api";
+
 export const generateImage = async (prompt: string): Promise<string> => {
-  const response = await fetch("http://localhost:3002/api/generate", {
+  const response = await fetch(`${API_BASE_URL}/generate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -24,7 +29,7 @@ interface VariationResponse {
 export const generateVariations = async (
   prompt: string
 ): Promise<VariationResponse[]> => {
-  const response = await fetch("http://localhost:3002/api/variations", {
+  const response = await fetch(`${API_BASE_URL}/variations`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
