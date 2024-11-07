@@ -2,6 +2,10 @@
 
 Quickly explore variations of AI generated images.
 
+# Demo
+
+![Demo](./image-generator.gif)
+
 # Quickstart
 
 ```
